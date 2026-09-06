@@ -25,3 +25,6 @@ Thumbs.db
 # Uploads / Runtime files
 uploads/
 target/test-uploads/
+backend/data/
+*.mv.db
+*.trace.db
