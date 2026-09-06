@@ -1,0 +1,36 @@
+# HoneyChain Frontend — .dockerignore
+# Exclude files that should not be copied into the Docker build context
+
+# Version control
+.git
+.gitignore
+
+# Dependencies (Docker installs its own)
+node_modules/
+
+# Previous build output (Docker builds fresh)
+dist/
+
+# Local environment files (NEVER ship secrets into images)
+.env
+.env.local
+.env.*.local
+
+# IDE / editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Test coverage
+coverage/
+
+# Development-only config (not needed in production image)
+# Note: vite.config.js IS needed for the build stage
+README.md

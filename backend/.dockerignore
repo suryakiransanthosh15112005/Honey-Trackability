@@ -1,0 +1,52 @@
+# HoneyChain Backend — .dockerignore
+# Exclude files that should not be copied into the Docker build context
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Build artifacts (Docker builds its own inside the container)
+target/
+
+# IDE / editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+
+# Local environment files (NEVER copy secrets into images)
+.env
+.env.local
+.env.*.local
+
+# Development logs
+*.log
+backend-*.log
+logs/
+
+# Test reports
+target/surefire-reports/
+
+# Uploaded files (mounted as a volume at runtime)
+uploads/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in container)
+README.md
+HELP.md
+ARCHITECTURE.md
+DEPLOYMENT.md
+LIMITATIONS.md
+SYSTEM_STATUS.md
+DATA_SOURCE_AUDIT.md
+
+# Wrapper scripts not needed (Maven is installed in the build image)
+# Keep mvnw/mvnw.cmd if not using pre-installed maven image

@@ -1,0 +1,27 @@
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+application-local.properties
+application-secret.properties
+
+# Build outputs
+target/
+dist/
+build/
+node_modules/
+
+# Logs
+*.log
+logs/
+
+# IDE & OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Uploads / Runtime files
+uploads/
+target/test-uploads/

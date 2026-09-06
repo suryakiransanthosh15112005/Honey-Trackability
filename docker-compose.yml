@@ -1,0 +1,135 @@
+# ============================================================
+# HoneyChain — Docker Compose
+# Services: mysql | backend | frontend
+# ============================================================
+#
+# QUICK START:
+#   1. Copy backend/.env.example to backend/.env and fill in values
+#   2. docker compose build
+#   3. docker compose up -d
+#   4. docker compose ps   (verify all healthy)
+#   5. Visit http://localhost (frontend)
+#      Visit http://localhost:8080/api/health (backend health)
+#      Visit http://localhost:8080/swagger-ui.html (API docs)
+#
+# IMPORTANT NOTES:
+#   - VITE_API_BASE_URL must be the URL the USER'S BROWSER can reach the backend.
+#     For local Docker: http://localhost:8080
+#     For deployed environments: https://api.honeychain.example.com
+#   - MySQL data is persisted in the 'mysql_data' named volume.
+#     Do NOT run 'docker compose down -v' unless you intend to wipe the database.
+#   - Uploaded files (QR codes, photos) are mounted to ./uploads on the host.
+# ============================================================
+services:
+
+  # ── MySQL 8 Database ──────────────────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: honeychain-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: honeychain_db
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      # Named volume ensures data persists across container restarts
+      - mysql_data:/var/lib/mysql
+    # Expose MySQL only for local development debugging. Comment out for production.
+    ports:
+      - "3306:3306"
+    networks:
+      - honeychain-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "--password=${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── Spring Boot Backend ───────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: honeychain-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      # Database — connect to mysql service by its Compose service name (internal Docker network)
+      DB_URL: jdbc:mysql://mysql:3306/honeychain_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      # JWT — must be a strong secret in production (min 64 hex chars)
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      # CORS & QR URL — must be the publicly reachable frontend URL
+      FRONTEND_PUBLIC_URL: ${FRONTEND_PUBLIC_URL:-http://localhost}
+      # File storage — volume-mounted at /app/uploads
+      UPLOAD_DIRECTORY: /app/uploads
+      # Mock service flags
+      BLOCKCHAIN_MODE: ${BLOCKCHAIN_MODE:-mock}
+      IOT_MOCK_ENABLED: ${IOT_MOCK_ENABLED:-true}
+      NOTIFICATION_SMS_ENABLED: ${NOTIFICATION_SMS_ENABLED:-false}
+      DEMO_DATA_ENABLED: ${DEMO_DATA_ENABLED:-false}
+      AI_PREDICTION_MAX_AGE: ${AI_PREDICTION_MAX_AGE:-24}
+      VERIFICATION_FINGERPRINT_SALT: ${VERIFICATION_FINGERPRINT_SALT:-honeychain-secure-salt-2026}
+    volumes:
+      # Mount uploads dir so files persist across container restarts
+      - ./uploads:/app/uploads
+    ports:
+      - "8080:8080"
+    networks:
+      - honeychain-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── React Frontend (Nginx) ────────────────────────────────
+  frontend:
+    build:
+      context: ./my-react-app
+      dockerfile: Dockerfile
+      args:
+        # VITE_API_BASE_URL is baked into the production JS bundle at build time.
+        # It MUST be the URL the user's browser can reach the backend API.
+        # For local Docker: http://localhost:8080
+        # For deployed: https://api.honeychain.example.com
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+    container_name: honeychain-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    networks:
+      - honeychain-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+# ── Volumes ───────────────────────────────────────────────────
+volumes:
+  mysql_data:
+    driver: local
+    # This named volume persists MySQL data between container restarts.
+    # WARNING: 'docker compose down -v' will DELETE this volume and ALL data.
+    # Use 'docker compose down' (without -v) for normal shutdown.
+
+# ── Networks ──────────────────────────────────────────────────
+networks:
+  honeychain-network:
+    driver: bridge
+    # Private network: backend can reach mysql by service name 'mysql'.
+    # Frontend container serves static files; the browser talks directly
+    # to the backend via the published port 8080.
